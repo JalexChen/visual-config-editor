@@ -1,12 +1,15 @@
+import { Job } from '@circleci/circleci-config-sdk';
 import ReactFlow, {
   Background,
   BackgroundVariant,
   FlowTransform,
+  isNode,
   Node,
   NodeTypesType,
 } from 'react-flow-renderer';
 import { v4 } from 'uuid';
 import { dataMappings } from '../../mappings/ComponentMapping';
+import { WorkflowJob } from '../../mappings/JobMapping';
 import { useStoreActions, useStoreState } from '../../state/Hooks';
 import { WorkflowModel } from '../../state/Store';
 
@@ -58,6 +61,61 @@ const WorkflowPane = (props: ElementProps) => {
       onDrop={(e) => {
         if (e.dataTransfer.types.includes('workflow')) {
           const transfer = JSON.parse(e.dataTransfer.getData('workflow'));
+          console.log(
+            "e.dataTransfer.getData('workflow') = " +
+              e.dataTransfer.getData('workflow'),
+          );
+
+          const indexsTaken: { [key: number]: boolean } = {};
+          const fullName = (transfer.data.parameters?.name || transfer.data.job.name);
+          const rawName = fullName.replace(/\d+$/, "");
+          const nameSuffixNum = fullName.replace(/\D/g, '');
+
+            console.log("full name= " +fullName);
+            console.log("rawName= " +rawName) ;
+            console.log("indexsTaken= " +indexsTaken) ;
+            console.log("nameSuffixNum= " +nameSuffixNum);
+
+          var elementnames = elements.forEach((element) => {
+            if (isNode(element) && element.data && element.type === 'job') {
+              const jobName: string = (
+                element.data.parameters?.name || element.data.job.name
+              ).trim();
+              console.log("jobName= " +jobName) ;
+              const matches = jobName.match(
+                `^${rawName}($|\\d+$)`,
+              );
+              console.log(matches)
+              if (matches) {
+                indexsTaken[matches[1] === '' ? 0 : Number(matches[1].trim())] = true; 
+              }
+            }
+          });
+
+          const foundIndexes = Object.keys(indexsTaken);
+          let freeIndex: number | undefined = undefined;
+          let newName = fullName;
+
+          if (foundIndexes.length > 0) {
+            foundIndexes.forEach((value, index) => {
+              if (Number(value) !== index) {
+                freeIndex = index;
+              }
+
+              console.log(`${freeIndex} - value: ${value}, index: ${index}`)
+            })
+
+            console.log("found Index= " + foundIndexes, "free index= "+freeIndex)
+
+            if (freeIndex === undefined) { 
+              newName = `${rawName} ${foundIndexes.length}`
+            } else {
+              newName = `${rawName} ${parseInt(nameSuffixNum)+1}`
+            }
+          }
+
+          console.log(`Old name: ${fullName} New Name: ${newName}`)
+
           const pos = {
             x: e.clientX - gap - curTransform.x,
             y: e.clientY - gap * 3 - curTransform.y,
@@ -77,7 +135,12 @@ const WorkflowPane = (props: ElementProps) => {
             addWorkflowElement(workflowNode);
           }
         }
+
+        console.log("names"+elementnames)
+        
+
       }}
+
     >
       <ReactFlow
         elements={elements}
